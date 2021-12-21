@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using Gtk;
 using UI = Gtk.Builder.ObjectAttribute;
+using System.Text;
 
 namespace Encrychat
 {
@@ -14,6 +16,7 @@ namespace Encrychat
         [UI] private TextView _messageTextField;
         [UI] private TextView _usernameTextField;
         [UI] private TextView _membersList;
+        private readonly List<string> _usernames = new ();
 
         public MainWindow() : this(new Builder("MainWindow.glade")) {}
 
@@ -21,24 +24,49 @@ namespace Encrychat
         {
             builder.Autoconnect(this);
 
-            _usernameTextField.Buffer.Text = "DefaultUsername";
-            _membersList.Buffer.Text += _usernameTextField.Buffer.Text + "\n";
-            DeleteEvent += Window_DeleteEvent;
+            _usernameTextField.Buffer.Text = Program.DefaultUsername;
+            _usernames.Add(Program.DefaultUsername);
+            UpdateMembersListView();
+            DeleteEvent += WindowDeleteEvent;
             _sendButton.Clicked += SendButtonClicked;
+            _usernameTextField.Buffer.Changed += UsernameChanged;
         }
 
-        private void Window_DeleteEvent(object sender, DeleteEventArgs a)
+        private void WindowDeleteEvent(object sender, DeleteEventArgs a) => Application.Quit();
+
+        private void UsernameChanged(object sender, EventArgs a)
         {
-            Application.Quit();
+            var newUserName = _usernameTextField.Buffer.Text.Trim();
+
+            if (newUserName != string.Empty)
+            {
+                // сообщить другим новый ник. (старый\nновый)
+                _usernames[0] = newUserName;
+                UpdateMembersListView();
+            }
+        }
+
+        private void UpdateMembersListView()
+        {
+            _membersList.Buffer.Text = string.Empty;
+
+            for (var i = 0; i < _usernames.Count; i++)
+            {
+                _membersList.Buffer.Text += _usernames[i] + (i == 0 ? " (Вы)\n" : "\n");
+            }
         }
 
         private void SendButtonClicked(object sender, EventArgs a)
         {
-            if (_messageTextField.Buffer.Text != string.Empty)
+            var message = _messageTextField.Buffer.Text.Trim();
+            
+            if (message != string.Empty)
             {
-                _chatTextField.Buffer.Text +=
-                        _usernameTextField.Buffer.Text + ": " + _messageTextField.Buffer.Text + "\n";
+                var resultMessage = _usernames[0] + ": " + message + "\n";
+
+                _chatTextField.Buffer.Text += resultMessage;
                 _messageTextField.Buffer.Text = string.Empty;
+                Program.SendMessage(resultMessage);
             }
         }
     }
