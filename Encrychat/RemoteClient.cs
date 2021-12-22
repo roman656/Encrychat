@@ -5,19 +5,19 @@ using System.Threading;
 
 namespace Encrychat
 {
-    public class Client
+    public class RemoteClient
     {
         public readonly string Index = Guid.NewGuid().ToString();
         private readonly TcpClient _client;
-        private readonly Server _server;
+        private readonly LocalServer _localServer;
         public string Username;
         public NetworkStream Stream { get; private set; }
  
-        public Client(TcpClient client, Server server)
+        public RemoteClient(TcpClient client, LocalServer localServer)
         {
             _client = client;
-            _server = server;
-            _server.AddConnection(this);
+            _localServer = localServer;
+            _localServer.AddConnection(this);
         }
  
         public void Process()
@@ -30,19 +30,19 @@ namespace Encrychat
                 Username = initMessage;
                 
                 var message = $"-[{Username} вошел в чат]-\n";
-                _server.SendBroadcastMessage(message, Index);
+                //_localServer.SendBroadcastMessage(message, Index);
 
                 while (true)
                 {
                     try
                     {
-                        Thread.Sleep(30);
+                        Thread.Sleep(50);
                         message = GetMessage();
                     }
                     catch
                     {
                         message = $"-[{Username} покинул чат]-\n";
-                        _server.SendBroadcastMessage(message, Index);
+                        //_localServer.SendBroadcastMessage(message, Index);
                         break;
                     }
                 }
@@ -53,7 +53,7 @@ namespace Encrychat
             }
             finally
             {
-                _server.DeleteConnection(Index);
+                _localServer.DeleteConnection(Index);
                 Close();
             }
         }

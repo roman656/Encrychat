@@ -7,27 +7,27 @@ using System.Threading;
 
 namespace Encrychat
 {
-    public class Server
+    public class LocalServer
     {
-        public readonly List<Client> Clients = new ();
+        public readonly List<RemoteClient> Clients = new ();
         private TcpListener _listener;
 
         public void Listen()
         {
             try
             {
-                _listener = new TcpListener(Program.LocalAddress, Program.Port);
+                _listener = new TcpListener(Settings.LocalAddress, Settings.Port);
                 _listener.Start();
 
                 while (true)
                 {
-                    Console.WriteLine("Ожидание подключений...");
+                    Console.WriteLine("S: Ожидание подключений...");
                     
                     var tcpClient = _listener.AcceptTcpClient();
                     
-                    Console.WriteLine("Принят запрос на подключение.");
+                    Console.WriteLine("S: Принят запрос на подключение.");
                     
-                    var client = new Client(tcpClient, this);
+                    var client = new RemoteClient(tcpClient, this);
                     var clientThread = new Thread(client.Process);
                     clientThread.Start();
                 }
@@ -52,7 +52,7 @@ namespace Encrychat
             }
         }
         
-        public void AddConnection(Client client) => Clients.Add(client);
+        public void AddConnection(RemoteClient client) => Clients.Add(client);
 
         public void DeleteConnection(string clientIndex)
         {
@@ -73,7 +73,7 @@ namespace Encrychat
                 Clients[i].Close();
             }
             
-            Environment.Exit(0);    // Завершение процесса.
+            Environment.Exit(0);
         }
     }
 }

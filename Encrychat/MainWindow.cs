@@ -10,19 +10,23 @@ namespace Encrychat
         [UI] private Label _membersLabel;
         [UI] private Button _sendButton;
         [UI] private Button _keysButton;
-        [UI] public TextView _chatTextField;
+        [UI] private TextView _chatTextField;
         [UI] private TextView _messageTextField;
         [UI] private TextView _usernameTextField;
         [UI] private TextView _membersList;
+        private readonly LocalServer _localServer;
 
-        public MainWindow() : this(new Builder("MainWindow.glade")) {}
+        public MainWindow(LocalServer localServer) : this(new Builder("MainWindow.glade"))
+        {
+            _localServer = localServer;
+        }
 
         private MainWindow(Builder builder) : base(builder.GetRawOwnedObject("MainWindow"))
         {
             builder.Autoconnect(this);
             
-            _usernameTextField.Buffer.Text = Program.Server.Clients[0].Username;
-            UpdateMembersListView();
+            _usernameTextField.Buffer.Text = Settings.DefaultUsername;
+            //UpdateMembersListView();
             DeleteEvent += WindowDeleteEvent;
             _sendButton.Clicked += SendButtonClicked;
             _usernameTextField.Buffer.Changed += UsernameChanged;
@@ -50,9 +54,9 @@ namespace Encrychat
         {
             _membersList.Buffer.Text = string.Empty;
 
-            for (var i = 0; i < Program.Server.Clients.Count; i++)
+            for (var i = 0; i < _localServer.Clients.Count; i++)
             {
-                _membersList.Buffer.Text += Program.Server.Clients[i].Username + (i == 0 ? " (Вы)\n" : "\n");
+                _membersList.Buffer.Text += _localServer.Clients[i].Username + (i == 0 ? " (Вы)\n" : "\n");
             }
         }
 
@@ -62,11 +66,11 @@ namespace Encrychat
             
             if (message != string.Empty)
             {
-                var resultMessage = Program.Server.Clients[0].Username + ": " + message + "\n";
+                var resultMessage = _localServer.Clients[0].Username + ": " + message + "\n";
 
                 _chatTextField.Buffer.Text += resultMessage;
                 _messageTextField.Buffer.Text = string.Empty;
-                Program.SendMessage(resultMessage);
+                //Program.SendMessage(resultMessage);
             }
         }
     }
