@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -10,15 +9,14 @@ namespace Encrychat
 {
     public class Server
     {
-        private readonly IPAddress _localAddress = IPAddress.Any;
-        private readonly List<Client> _clients = new ();
+        public readonly List<Client> Clients = new ();
         private TcpListener _listener;
 
         public void Listen()
         {
             try
             {
-                _listener = new TcpListener(_localAddress, Program.Port);
+                _listener = new TcpListener(Program.LocalAddress, Program.Port);
                 _listener.Start();
 
                 while (true)
@@ -41,28 +39,28 @@ namespace Encrychat
             }
         }
         
-        public void BroadcastMessage(string message, string senderIndex)
+        public void SendBroadcastMessage(string message, string senderIndex)
         {
             var data = Encoding.UTF8.GetBytes(message);
             
-            for (var i = 0; i < _clients.Count; i++)
+            for (var i = 0; i < Clients.Count; i++)
             {
-                if (_clients[i].Index != senderIndex)
+                if (Clients[i].Index != senderIndex)
                 {
-                    _clients[i].Stream.Write(data, 0, data.Length);
+                    Clients[i].Stream.Write(data, 0, data.Length);
                 }
             }
         }
         
-        public void AddConnection(Client client) => _clients.Add(client);
+        public void AddConnection(Client client) => Clients.Add(client);
 
         public void DeleteConnection(string clientIndex)
         {
-            var client = _clients.FirstOrDefault(client => client.Index == clientIndex);
+            var client = Clients.FirstOrDefault(client => client.Index == clientIndex);
             
             if (client != null)
             {
-                _clients.Remove(client);
+                Clients.Remove(client);
             }
         }
 
@@ -70,9 +68,9 @@ namespace Encrychat
         {
             _listener.Stop();
  
-            for (var i = 0; i < _clients.Count; i++)
+            for (var i = 0; i < Clients.Count; i++)
             {
-                _clients[i].Close();
+                Clients[i].Close();
             }
             
             Environment.Exit(0);    // Завершение процесса.

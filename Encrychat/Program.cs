@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -8,12 +9,14 @@ namespace Encrychat
 {
     public class Program
     {
-        public const int Port = 8888;
+        public const int Port = 50495;
+        public static readonly IPAddress LocalAddress = IPAddress.Loopback;
         public const string DefaultUsername = "NewUser";
         public static string Username = DefaultUsername;
-        private static readonly TcpClient Client = new ();
+        public static readonly TcpClient Client = new ();
         private static NetworkStream _stream;
-        private static readonly Server Server = new ();
+        public static readonly Server Server = new ();
+        private static MainWindow mainWindow;
         private static readonly Thread ListenThread = new (Server.Listen);
         
         [STAThread]
@@ -24,7 +27,7 @@ namespace Encrychat
             Application.Init();
 
             var application = new Application("roman656.Encrychat", GLib.ApplicationFlags.None);
-            var mainWindow = new MainWindow();
+            mainWindow = new MainWindow();
             
             application.Register(GLib.Cancellable.Current);
             application.AddWindow(mainWindow);
@@ -49,7 +52,7 @@ namespace Encrychat
         {
             try
             {
-                Client.Connect("localhost", Port);
+                Client.Connect(LocalAddress, Port);
                 _stream = Client.GetStream();
                 SendMessage(Username);
 
@@ -59,10 +62,6 @@ namespace Encrychat
             catch (Exception exception)
             {
                 Console.WriteLine(exception.Message);
-            }
-            finally
-            {
-                Disconnect();
             }
         }
 
@@ -78,11 +77,11 @@ namespace Encrychat
             {
                 while (true)
                 {
+                    Thread.Sleep(30);
                     var data = new byte[Client.ReceiveBufferSize];
-                
                     _stream.Read(data, 0, Client.ReceiveBufferSize);
-                
                     var message = Encoding.UTF8.GetString(data);
+                    mainWindow._chatTextField.Buffer.Text += message;
                 }
             }
             catch

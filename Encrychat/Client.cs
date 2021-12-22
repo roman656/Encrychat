@@ -1,6 +1,7 @@
 using System;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 
 namespace Encrychat
 {
@@ -9,7 +10,7 @@ namespace Encrychat
         public readonly string Index = Guid.NewGuid().ToString();
         private readonly TcpClient _client;
         private readonly Server _server;
-        private string _username;
+        public string Username;
         public NetworkStream Stream { get; private set; }
  
         public Client(TcpClient client, Server server)
@@ -26,22 +27,22 @@ namespace Encrychat
                 Stream = _client.GetStream();
                 
                 var initMessage = GetMessage();
-                _username = initMessage;
+                Username = initMessage;
                 
-                var message = $"-[{_username} вошел в чат]-\n";
-                _server.BroadcastMessage(message, Index);
+                var message = $"-[{Username} вошел в чат]-\n";
+                _server.SendBroadcastMessage(message, Index);
 
                 while (true)
                 {
                     try
                     {
+                        Thread.Sleep(30);
                         message = GetMessage();
-                        _server.BroadcastMessage(message, Index);
                     }
                     catch
                     {
-                        message = $"-[{_username} покинул чат]-\n";
-                        _server.BroadcastMessage(message, Index);
+                        message = $"-[{Username} покинул чат]-\n";
+                        _server.SendBroadcastMessage(message, Index);
                         break;
                     }
                 }

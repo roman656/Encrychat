@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using Gtk;
 using UI = Gtk.Builder.ObjectAttribute;
-using System.Text;
 
 namespace Encrychat
 {
@@ -12,27 +10,29 @@ namespace Encrychat
         [UI] private Label _membersLabel;
         [UI] private Button _sendButton;
         [UI] private Button _keysButton;
-        [UI] private TextView _chatTextField;
+        [UI] public TextView _chatTextField;
         [UI] private TextView _messageTextField;
         [UI] private TextView _usernameTextField;
         [UI] private TextView _membersList;
-        private readonly List<string> _usernames = new ();
 
         public MainWindow() : this(new Builder("MainWindow.glade")) {}
 
         private MainWindow(Builder builder) : base(builder.GetRawOwnedObject("MainWindow"))
         {
             builder.Autoconnect(this);
-
-            _usernameTextField.Buffer.Text = Program.DefaultUsername;
-            _usernames.Add(Program.DefaultUsername);
+            
+            _usernameTextField.Buffer.Text = Program.Server.Clients[0].Username;
             UpdateMembersListView();
             DeleteEvent += WindowDeleteEvent;
             _sendButton.Clicked += SendButtonClicked;
             _usernameTextField.Buffer.Changed += UsernameChanged;
         }
 
-        private void WindowDeleteEvent(object sender, DeleteEventArgs a) => Application.Quit();
+        private void WindowDeleteEvent(object sender, DeleteEventArgs a)
+        {
+            Application.Quit();
+            Environment.Exit(0);
+        }
 
         private void UsernameChanged(object sender, EventArgs a)
         {
@@ -41,7 +41,7 @@ namespace Encrychat
             if (newUserName != string.Empty)
             {
                 // сообщить другим новый ник. (старый\nновый)
-                _usernames[0] = newUserName;
+                //_usernames[0] = newUserName;
                 UpdateMembersListView();
             }
         }
@@ -50,9 +50,9 @@ namespace Encrychat
         {
             _membersList.Buffer.Text = string.Empty;
 
-            for (var i = 0; i < _usernames.Count; i++)
+            for (var i = 0; i < Program.Server.Clients.Count; i++)
             {
-                _membersList.Buffer.Text += _usernames[i] + (i == 0 ? " (Вы)\n" : "\n");
+                _membersList.Buffer.Text += Program.Server.Clients[i].Username + (i == 0 ? " (Вы)\n" : "\n");
             }
         }
 
@@ -62,7 +62,7 @@ namespace Encrychat
             
             if (message != string.Empty)
             {
-                var resultMessage = _usernames[0] + ": " + message + "\n";
+                var resultMessage = Program.Server.Clients[0].Username + ": " + message + "\n";
 
                 _chatTextField.Buffer.Text += resultMessage;
                 _messageTextField.Buffer.Text = string.Empty;
