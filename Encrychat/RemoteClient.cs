@@ -9,15 +9,16 @@ namespace Encrychat
     {
         public readonly string Index = Guid.NewGuid().ToString();
         private readonly TcpClient _client;
-        private readonly LocalServer _localServer;
+        private readonly LocalListener _localListener;
         public string Username;
+        public string PublicKey;
         public NetworkStream Stream { get; private set; }
  
-        public RemoteClient(TcpClient client, LocalServer localServer)
+        public RemoteClient(TcpClient client, LocalListener localListener)
         {
             _client = client;
-            _localServer = localServer;
-            _localServer.AddConnection(this);
+            _localListener = localListener;
+            _localListener.AddConnection(this);
         }
  
         public void Process()
@@ -53,7 +54,7 @@ namespace Encrychat
             }
             finally
             {
-                _localServer.DeleteConnection(Index);
+                _localListener.DeleteConnection(Index);
                 Close();
             }
         }

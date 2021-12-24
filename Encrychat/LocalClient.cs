@@ -7,6 +7,7 @@ namespace Encrychat
 {
     public class LocalClient
     {
+        public readonly string Index = Guid.NewGuid().ToString();
         public string Username = Settings.DefaultUsername;
         private readonly TcpClient _client = new ();
         private readonly NetworkStream _stream;

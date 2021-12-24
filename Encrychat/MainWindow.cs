@@ -14,22 +14,24 @@ namespace Encrychat
         [UI] private TextView _messageTextField;
         [UI] private TextView _usernameTextField;
         [UI] private TextView _membersList;
-        private readonly LocalServer _localServer;
+        private readonly LocalListener _localListener;
+        private readonly LocalClient _localClient;
 
-        public MainWindow(LocalServer localServer) : this(new Builder("MainWindow.glade"))
-        {
-            _localServer = localServer;
-        }
-
+        public MainWindow() : this(new Builder("MainWindow.glade")) {}
+        
         private MainWindow(Builder builder) : base(builder.GetRawOwnedObject("MainWindow"))
         {
             builder.Autoconnect(this);
             
-            _usernameTextField.Buffer.Text = Settings.DefaultUsername;
-            //UpdateMembersListView();
             DeleteEvent += WindowDeleteEvent;
             _sendButton.Clicked += SendButtonClicked;
+            _keysButton.Clicked += KeysButtonClicked;
             _usernameTextField.Buffer.Changed += UsernameChanged;
+
+            _localListener = new LocalListener();
+            _localClient = new LocalClient();
+            _usernameTextField.Buffer.Text = _localClient.Username;
+            UpdateMembersListView();
         }
 
         private void WindowDeleteEvent(object sender, DeleteEventArgs a)
@@ -38,6 +40,8 @@ namespace Encrychat
             Environment.Exit(0);
         }
 
+        private void KeysButtonClicked(object sender, EventArgs a) => PrintKeysToChat();
+
         private void UsernameChanged(object sender, EventArgs a)
         {
             var newUserName = _usernameTextField.Buffer.Text.Trim();
@@ -45,7 +49,7 @@ namespace Encrychat
             if (newUserName != string.Empty)
             {
                 // сообщить другим новый ник. (старый\nновый)
-                //_usernames[0] = newUserName;
+                _localClient.Username = newUserName;
                 UpdateMembersListView();
             }
         }
@@ -53,10 +57,11 @@ namespace Encrychat
         private void UpdateMembersListView()
         {
             _membersList.Buffer.Text = string.Empty;
+            _membersList.Buffer.Text += $"{_localClient.Username} (Вы)\n";
 
-            for (var i = 0; i < _localServer.Clients.Count; i++)
+            foreach (var client in _localListener.Clients)
             {
-                _membersList.Buffer.Text += _localServer.Clients[i].Username + (i == 0 ? " (Вы)\n" : "\n");
+                _membersList.Buffer.Text += $"{client.Username}\n";
             }
         }
 
@@ -66,12 +71,23 @@ namespace Encrychat
             
             if (message != string.Empty)
             {
-                var resultMessage = _localServer.Clients[0].Username + ": " + message + "\n";
-
-                _chatTextField.Buffer.Text += resultMessage;
+                //var encryptedMessage = Encryptor.Encrypt(message);
+                
+                PrintMessageToChat(_localClient.Username, message);
+                //PrintMessageToChat($"{_localClient.Username}][шифрованное", encryptedMessage);
                 _messageTextField.Buffer.Text = string.Empty;
-                //Program.SendMessage(resultMessage);
+                _localListener.SendBroadcastMessage(message, _localClient.Index);
             }
+        }
+
+        private void PrintMessageToChat(string username, string message)
+        {
+            _chatTextField.Buffer.Text += $"[{username}]: {message}\n";
+        }
+        
+        private void PrintKeysToChat()
+        {
+            _chatTextField.Buffer.Text += Encryptor.GetKeysMessage();
         }
     }
 }

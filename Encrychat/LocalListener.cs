@@ -7,12 +7,27 @@ using System.Threading;
 
 namespace Encrychat
 {
-    public class LocalServer
+    public class LocalListener
     {
         public readonly List<RemoteClient> Clients = new ();
+        private readonly Thread _listenThread;
         private TcpListener _listener;
+        
+        public LocalListener()
+        {
+            try
+            {
+                _listenThread = new Thread(Listen);
+                _listenThread.Start();
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine(exception.Message);
+                Disconnect();
+            }
+        }
 
-        public void Listen()
+        private void Listen()
         {
             try
             {
@@ -64,7 +79,7 @@ namespace Encrychat
             }
         }
 
-        public void Disconnect()
+        private void Disconnect()
         {
             _listener.Stop();
  
