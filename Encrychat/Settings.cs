@@ -8,10 +8,9 @@ namespace Encrychat
     {
         public const int Port = 50495;
         public static readonly IPAddress LocalAddress = GetLocalIPv4(NetworkInterfaceType.Ethernet);
-        public const string DefaultUsername = "NewUser";
         public const int KeySize = 2048;
         public const int SeparatorLinesSize = 23;
-        public const string DataSeparator = "~@#@~";
+        public const int MessageDataBufferSize = 64;
         
         private static IPAddress GetLocalIPv4(NetworkInterfaceType type)
         {

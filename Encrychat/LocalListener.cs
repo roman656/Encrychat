@@ -1,29 +1,30 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 
 namespace Encrychat
 {
     public class LocalListener
     {
-        public readonly List<RemoteClient> Clients = new ();
+        private readonly List<RemoteClient> _remoteClients = new ();
         private readonly Thread _listenThread;
         private TcpListener _listener;
-        
-        public LocalListener()
+        private readonly AddMessage _addMessageDelegate;
+
+        public LocalListener(AddMessage addMessageDelegate)
         {
             try
             {
+                _addMessageDelegate = addMessageDelegate;
                 _listenThread = new Thread(Listen);
+                _listenThread.IsBackground = true;
                 _listenThread.Start();
             }
             catch (Exception exception)
             {
                 Console.WriteLine(exception.Message);
-                Disconnect();
             }
         }
 
@@ -36,59 +37,59 @@ namespace Encrychat
 
                 while (true)
                 {
-                    Console.WriteLine("S: Ожидание подключений...");
+                    var remoteClient = _listener.AcceptTcpClient();
+                    var address = ((IPEndPoint)remoteClient.Client.RemoteEndPoint)?.Address;
+                    var message = string.Empty;
                     
-                    var tcpClient = _listener.AcceptTcpClient();
+                    foreach (var client in _remoteClients)
+                    {
+                        if (client.Address.Equals(address))
+                        {
+                            message = client.GetMessage(remoteClient);
+                            break;
+                        }
+                    }
                     
-                    Console.WriteLine("S: Принят запрос на подключение.");
-                    
-                    var client = new RemoteClient(tcpClient, this);
-                    var clientThread = new Thread(client.Process);
-                    clientThread.Start();
+                    _addMessageDelegate.Invoke(address, message, false);
                 }
             }
             catch (Exception exception)
             {
                 Console.WriteLine(exception.Message);
-                Disconnect();
+            }
+            finally
+            {
+                _listener?.Stop();
             }
         }
         
-        public void SendBroadcastMessage(string message, string senderIndex)
+        public void SendMessageToAllClients(string message)
         {
-            var data = Encoding.UTF8.GetBytes(message);
-            
-            for (var i = 0; i < Clients.Count; i++)
+            foreach (var client in _remoteClients)
             {
-                if (Clients[i].Index != senderIndex)
+                client.SendMessage(message);
+            }
+        }
+        
+        public bool AddRemoteClient(RemoteClient newClient)
+        {
+            var hasThisClient = false;
+            
+            foreach (var client in _remoteClients)
+            {
+                if (client.Address.Equals(newClient.Address))
                 {
-                    Clients[i].Stream.Write(data, 0, data.Length);
+                    hasThisClient = true;
+                    break;
                 }
             }
-        }
-        
-        public void AddConnection(RemoteClient client) => Clients.Add(client);
 
-        public void DeleteConnection(string clientIndex)
-        {
-            var client = Clients.FirstOrDefault(client => client.Index == clientIndex);
-            
-            if (client != null)
+            if (!hasThisClient)
             {
-                Clients.Remove(client);
+                _remoteClients.Add(newClient);
             }
-        }
 
-        private void Disconnect()
-        {
-            _listener.Stop();
- 
-            for (var i = 0; i < Clients.Count; i++)
-            {
-                Clients[i].Close();
-            }
-            
-            Environment.Exit(0);
+            return !hasThisClient;
         }
     }
 }

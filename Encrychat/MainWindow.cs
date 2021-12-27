@@ -8,18 +8,16 @@ using UI = Gtk.Builder.ObjectAttribute;
 
 namespace Encrychat
 {
+    public delegate void AddMessage(IPAddress userAddress, string message, bool isEncrypted);
+    
     public class MainWindow : Window
     {
-        [UI] private Label _messageLabel;
-        [UI] private Label _membersLabel;
         [UI] private Button _sendButton;
         [UI] private Button _keysButton;
         [UI] private TextView _chatTextField;
         [UI] private TextView _messageTextField;
-        [UI] private TextView _usernameTextField;
-        [UI] private TextView _membersList;
-        private readonly LocalListener _localListener = new ();
-        private readonly LocalClient _localClient = new ();
+        private readonly AddMessage _addMessageDelegate;
+        private readonly LocalListener _localListener;
         private readonly UdpClient _receivingClient = new (Settings.Port);
         private Thread _receivingThread;
 
@@ -32,25 +30,30 @@ namespace Encrychat
             DeleteEvent += WindowDeleteEvent;
             _sendButton.Clicked += SendButtonClicked;
             _keysButton.Clicked += KeysButtonClicked;
-            _usernameTextField.Buffer.Changed += UsernameChanged;
 
-            _usernameTextField.Buffer.Text = _localClient.Username;
-            UpdateMembersListView();
-
+            _addMessageDelegate = PrintMessageToChat;
+            _localListener = new LocalListener(_addMessageDelegate);
+            
             InitializeReceiver();
-            SendInitialBroadcastMessage($"{_localClient.Username}{Settings.DataSeparator}{Encryptor.PublicKey}");
+            SendInitialBroadcastMessage(Encryptor.PublicKey);
         }
 
         private static void SendInitialBroadcastMessage(string message)
         {
             var data = Encoding.UTF8.GetBytes(message);
-            var client = new UdpClient
-            {
-                EnableBroadcast = true,
-                MulticastLoopback = false
-            };
+            var client = new UdpClient();
             
+            client.EnableBroadcast = true;
             client.Send(data, data.Length, IPAddress.Broadcast.ToString(), Settings.Port);
+            client.Close();
+        }
+        
+        private static void SendInitialDirectMessage(IPAddress address, string message)
+        {
+            var data = Encoding.UTF8.GetBytes(message);
+            var client = new UdpClient();
+   
+            client.Send(data, data.Length, address.ToString(), Settings.Port);
             client.Close();
         }
         
@@ -77,8 +80,12 @@ namespace Encrychat
                     }
                     
                     var message = Encoding.ASCII.GetString(data);
-                    var initialData = message.Split(Settings.DataSeparator, StringSplitOptions.RemoveEmptyEntries);
-                    PrintMessageToChat($"[{initialData[0]}]", $"{initialData[1]}");
+                    var wasAdded = _localListener.AddRemoteClient(new RemoteClient(endPoint.Address, message, _addMessageDelegate));
+                    
+                    if (wasAdded)
+                    {
+                        SendInitialDirectMessage(endPoint.Address, Encryptor.PublicKey);
+                    }
                 }
             }
             catch (Exception exception)
@@ -99,47 +106,21 @@ namespace Encrychat
 
         private void KeysButtonClicked(object sender, EventArgs a) => PrintKeysToChat();
 
-        private void UsernameChanged(object sender, EventArgs a)
-        {
-            var newUserName = _usernameTextField.Buffer.Text.Trim();
-
-            if (newUserName != string.Empty)
-            {
-                // сообщить другим новый ник. (старый\nновый)
-                _localClient.Username = newUserName;
-                UpdateMembersListView();
-            }
-        }
-
-        private void UpdateMembersListView()
-        {
-            _membersList.Buffer.Text = string.Empty;
-            _membersList.Buffer.Text += $"{_localClient.Username} (Вы)\n";
-
-            foreach (var client in _localListener.Clients)
-            {
-                _membersList.Buffer.Text += $"{client.Username}\n";
-            }
-        }
-
         private void SendButtonClicked(object sender, EventArgs a)
         {
             var message = _messageTextField.Buffer.Text.Trim();
             
             if (message != string.Empty)
             {
-                var encryptedMessage = Encryptor.Encrypt(message);
-                
-                PrintMessageToChat(_localClient.Username, message);
-                PrintMessageToChat($"{_localClient.Username}][шифрованное", encryptedMessage);
+                PrintMessageToChat(Settings.LocalAddress, message);
                 _messageTextField.Buffer.Text = string.Empty;
-                _localListener.SendBroadcastMessage(message, _localClient.Index);
+                _localListener.SendMessageToAllClients(message);
             }
         }
 
-        private void PrintMessageToChat(string username, string message)
+        private void PrintMessageToChat(IPAddress userAddress, string message, bool isEncrypted = false)
         {
-            _chatTextField.Buffer.Text += $"[{username}]: {message}\n";
+            _chatTextField.Buffer.Text += $"[{userAddress}]{(isEncrypted ? "[шифрованное]" : "")}: {message}\n";
         }
         
         private void PrintKeysToChat()

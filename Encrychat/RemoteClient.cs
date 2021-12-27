@@ -1,52 +1,37 @@
 using System;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
 
 namespace Encrychat
 {
     public class RemoteClient
     {
-        public readonly string Index = Guid.NewGuid().ToString();
-        private readonly TcpClient _client;
-        private readonly LocalListener _localListener;
-        public string Username;
-        public string PublicKey;
-        public NetworkStream Stream { get; private set; }
+        public readonly IPAddress Address;
+        private readonly string _publicKey;
+        private TcpClient _client;
+        private NetworkStream _stream;
+        private readonly AddMessage _addMessageDelegate;
  
-        public RemoteClient(TcpClient client, LocalListener localListener)
+        public RemoteClient(IPAddress address, string publicKey, AddMessage addMessageDelegate)
         {
-            _client = client;
-            _localListener = localListener;
-            _localListener.AddConnection(this);
+            Address = address;
+            _publicKey = publicKey;
+            _addMessageDelegate = addMessageDelegate;
         }
  
-        public void Process()
+        public void SendMessage(string message)
         {
             try
             {
-                Stream = _client.GetStream();
+                _client = new TcpClient();
+                _client.Connect(Address, Settings.Port);
+                _stream = _client.GetStream();
                 
-                var initMessage = GetMessage();
-                Username = initMessage;
-                
-                var message = $"-[{Username} вошел в чат]-\n";
-                //_localServer.SendBroadcastMessage(message, Index);
-
-                while (true)
-                {
-                    try
-                    {
-                        Thread.Sleep(50);
-                        message = GetMessage();
-                    }
-                    catch
-                    {
-                        message = $"-[{Username} покинул чат]-\n";
-                        //_localServer.SendBroadcastMessage(message, Index);
-                        break;
-                    }
-                }
+                var encryptedMessage = Encryptor.Encrypt(message, _publicKey);
+                _addMessageDelegate.Invoke(Address, encryptedMessage, true);
+                var data = Encoding.UTF8.GetBytes(encryptedMessage);
+                _stream.Write(data, 0, data.Length);
             }
             catch (Exception exception)
             {
@@ -54,23 +39,44 @@ namespace Encrychat
             }
             finally
             {
-                _localListener.DeleteConnection(Index);
                 Close();
             }
         }
         
-        private string GetMessage()
+        public string GetMessage(TcpClient client)
         {
-            var data = new byte[_client.ReceiveBufferSize];
+            var data = new byte[Settings.MessageDataBufferSize];
+            var builder = new StringBuilder();
             
-            Stream.Read(data, 0, _client.ReceiveBufferSize);
+            try
+            {
+                _client = client;
+                _stream = _client.GetStream();
+
+                do
+                {
+                    var readBytesAmount = _stream.Read(data, 0, data.Length);
+                    builder.Append(Encoding.UTF8.GetString(data, 0, readBytesAmount));
+                }
+                while (_stream.DataAvailable);
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine(exception.Message);
+            }
+            finally
+            {
+                Close();
+            }
             
-            return Encoding.UTF8.GetString(data);
+            _addMessageDelegate.Invoke(Address, builder.ToString(), true);
+            var decryptedMessage = Encryptor.Decrypt(builder.ToString());
+            return decryptedMessage;
         }
         
-        public void Close()
+        private void Close()
         {
-            Stream?.Close();
+            _stream?.Close();
             _client?.Close();
         }
     }
