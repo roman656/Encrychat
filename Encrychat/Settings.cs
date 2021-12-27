@@ -11,6 +11,7 @@ namespace Encrychat
         public const string DefaultUsername = "NewUser";
         public const int KeySize = 2048;
         public const int SeparatorLinesSize = 23;
+        public const string DataSeparator = "~@#@~";
         
         private static IPAddress GetLocalIPv4(NetworkInterfaceType type)
         {

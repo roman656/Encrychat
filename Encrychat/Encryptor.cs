@@ -11,7 +11,7 @@ namespace Encrychat
 
         static Encryptor()
         {
-            var rsa = new RSACryptoServiceProvider(Settings.KeySize);
+            using var rsa = new RSACryptoServiceProvider(Settings.KeySize);
             PublicKey = GetKeyString(rsa.ExportParameters(false));
             PrivateKey = GetKeyString(rsa.ExportParameters(true));
         }
@@ -37,14 +37,14 @@ namespace Encrychat
 
         public static string Encrypt(string text, string publicKey)
         {
-            var rsa = new RSACryptoServiceProvider(Settings.KeySize);
+            using var rsa = new RSACryptoServiceProvider(Settings.KeySize);
             rsa.FromXmlString(publicKey);
             return Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(text), false));
         }
 
         public static string Decrypt(string text, string privateKey)
         {
-            var rsa = new RSACryptoServiceProvider(Settings.KeySize);
+            using var rsa = new RSACryptoServiceProvider(Settings.KeySize);
             rsa.FromXmlString(privateKey);
             return Encoding.UTF8.GetString(rsa.Decrypt(Convert.FromBase64String(text), false));
         }

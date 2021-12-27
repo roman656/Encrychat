@@ -1,4 +1,8 @@
 using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
 using Gtk;
 using UI = Gtk.Builder.ObjectAttribute;
 
@@ -14,8 +18,10 @@ namespace Encrychat
         [UI] private TextView _messageTextField;
         [UI] private TextView _usernameTextField;
         [UI] private TextView _membersList;
-        private readonly LocalListener _localListener;
-        private readonly LocalClient _localClient;
+        private readonly LocalListener _localListener = new ();
+        private readonly LocalClient _localClient = new ();
+        private readonly UdpClient _receivingClient = new (Settings.Port);
+        private Thread _receivingThread;
 
         public MainWindow() : this(new Builder("MainWindow.glade")) {}
         
@@ -28,10 +34,61 @@ namespace Encrychat
             _keysButton.Clicked += KeysButtonClicked;
             _usernameTextField.Buffer.Changed += UsernameChanged;
 
-            _localListener = new LocalListener();
-            _localClient = new LocalClient();
             _usernameTextField.Buffer.Text = _localClient.Username;
             UpdateMembersListView();
+
+            InitializeReceiver();
+            SendInitialBroadcastMessage($"{_localClient.Username}{Settings.DataSeparator}{Encryptor.PublicKey}");
+        }
+
+        private static void SendInitialBroadcastMessage(string message)
+        {
+            var data = Encoding.UTF8.GetBytes(message);
+            var client = new UdpClient
+            {
+                EnableBroadcast = true,
+                MulticastLoopback = false
+            };
+            
+            client.Send(data, data.Length, IPAddress.Broadcast.ToString(), Settings.Port);
+            client.Close();
+        }
+        
+        private void InitializeReceiver()
+        {
+            _receivingThread = new Thread(Receiver);
+            _receivingThread.IsBackground = true;
+            _receivingThread.Start();
+        }
+        
+        private void Receiver()
+        {
+            IPEndPoint endPoint = null;
+
+            try
+            {
+                while (true)
+                {
+                    var data = _receivingClient.Receive(ref endPoint);
+                    
+                    if (endPoint.Address.Equals(Settings.LocalAddress))
+                    {
+                        continue;
+                    }
+                    
+                    var message = Encoding.ASCII.GetString(data);
+                    var initialData = message.Split(Settings.DataSeparator, StringSplitOptions.RemoveEmptyEntries);
+                    PrintMessageToChat($"[{initialData[0]}]", $"{initialData[1]}");
+                }
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine(exception.Message);
+            }
+            finally
+            {
+                _receivingClient.Close();
+            }
         }
 
         private void WindowDeleteEvent(object sender, DeleteEventArgs a)
@@ -71,10 +128,10 @@ namespace Encrychat
             
             if (message != string.Empty)
             {
-                //var encryptedMessage = Encryptor.Encrypt(message);
+                var encryptedMessage = Encryptor.Encrypt(message);
                 
                 PrintMessageToChat(_localClient.Username, message);
-                //PrintMessageToChat($"{_localClient.Username}][шифрованное", encryptedMessage);
+                PrintMessageToChat($"{_localClient.Username}][шифрованное", encryptedMessage);
                 _messageTextField.Buffer.Text = string.Empty;
                 _localListener.SendBroadcastMessage(message, _localClient.Index);
             }
